@@ -1,6 +1,343 @@
 pico-8 cartridge // http://www.pico-8.com
 version 8
 __lua__
+--       'the last crane'
+-- -------------------------
+--      2017  @headjump
+--            for LD39
+
+-- --[config]--
+--debug=true 
+st={} -- game state
+function _init() ngn_scene(sc_start()) end
+
+function sc_start()
+ return {
+  upd=function()
+   if(btnp(4) or btnp(5)) then ngn_scene(sc_game(1)) end
+  end,
+  drw=function()
+   cls()
+   print("start",20,20,11)
+  end
+ }
+end
+function sc_finished()
+ return {
+  upd=function()
+   if(btnp(4) or btnp(5)) then ngn_scene(sc_start()) end
+  end,
+  drw=function()
+   cls()
+   print("You did it!",20,20,12)
+  end
+ }
+end
+function sc_game(level,easy)
+ return {
+  upd=function()
+   if(btnp(4) or btnp(5)) then ngn_scene(sc_finished()) end
+  end,
+  drw=function()
+   cls()
+   print("game "..level,20,20,13)
+  end
+ }
+end
+
+
+-- ---------------- engine -----
+function _update() ngn_upd() end
+function _draw() ngn_drw() end
+-- ngn
+------
+
+-- keeps val in range
+-- also returns was_clamped?
+-- val<min => mim,true
+-- val>max => max,true
+-- otherwise val,false
+function in_range(val,min,max)
+ if(val<min) return min,true
+ if(val>max) return max,true
+ return val,false
+end
+
+-- random in range
+function ran(min,max)
+ return rnd(max-min)+min
+end
+
+-- get valid index in array
+-- for item at position given
+-- by 'fac' (factor 0..1)
+function array_index(cnt,fac)
+ return min(cnt,1+flr(cnt*fac))
+end
+
+-- create particle
+-- x,y
+-- sx,sy
+-- grav,lifetime
+-- sizes
+-- cols
+-- acc (default=1)
+function ngn_part(x,y,sx,sy,grav,lifetime,sizes,cols,acc)
+ if(not st.__part)then
+  st.__part=ngn_add({
+  parts={},
+  upd=function(e)
+   local new_p={}
+   for p in all(e.parts) do
+    p.x+=timed(p.sx) p.y+=timed(p.sy)
+    p.sx+=p.grav*timed(st.grav.x)
+    p.sx*=timed_fac(p.acc)
+    p.sy+=p.grav*timed(st.grav.y)
+    p.sy*=timed_fac(p.acc)
+    p.lifetime-=timed(1)
+    if(p.lifetime>=0) add(new_p,p)
+   end
+   e.parts=new_p
+  end,
+  layer=1,
+  drw=function(e)
+   for p in all(e.parts) do
+    local fac=1-(p.lifetime/p.init_lifetime)
+    local sh=p.sizes[array_index(#p.sizes,fac)]/2
+    local col=p.cols[array_index(#p.cols,fac)]
+    if(sh <=.7)then
+     pset(p.x,p.y,col)
+    else
+     rectfill(p.x-sh,p.y-sh,p.x+sh,p.y+sh,col)
+    end
+   end
+  end
+  })
+ end
+ add(st.__part.parts,{
+  x=x,y=y,sx=sx or 0,sy=sy or 0,sizes=sizes or {1},grav=grav or 0,
+  init_lifetime=lifetime or 20,acc=acc or 1,
+  lifetime=lifetime or 20,cols=cols or {0}
+ })
+end
+
+-- sign of val
+-- e.g
+--  sign(-5) => -1
+--  sugb(3)  => 1
+function sign(val)
+ if(val<0) return -1
+ return 1
+end
+
+function ngn_shake(from_x,to_x,from_y,to_y,frames)
+ st.shake={
+  x=0,y=0,cnt=frames or 5,
+  upd=function()
+   local sh = st.shake
+   sh.cnt-=timed(1)
+   sh.x=ran(from_x,to_x) sh.y=ran(from_y,to_y) 
+   if(sh.cnt<=0) st.shake=nil
+  end
+ }
+end
+
+-- val normalized by timescale
+-- timescale 1 => 1/30 sec
+function timed(val)
+ return st.timescale * val
+end
+
+-- factor normalized by timescale
+-- timescale 1 => 1/30 sec
+function timed_fac(fac)
+ return 1-(1-fac)*st.timescale
+end
+
+-- creates tweening object
+-- -----------------------
+-- obj -> tween target
+-- sec -> seconds till complete
+--          1step = 1/30sec
+-- to -> hash w/ target vals
+-- returns {
+--  upd() -> call every frame
+--  done -> boolean completed? 
+-- }
+function tween(obj,sec,to,ease)
+ ease=ease or ease_inout
+ local cur=0.0
+ local res={perc=0.0}
+ local begin={}
+ local dist={}
+ local steps=sec*30
+ for k,v in pairs(to) do begin[k]=obj[k] dist[k]=v-obj[k] end
+ res.upd=function()
+  if(res.done) return true
+  cur+=timed(1)
+  if(cur>=steps) cur=steps res.done=true
+  local fac=cur/steps
+  for k,v in pairs(dist) do
+   obj[k]=ease(begin[k],to[k],v,fac)
+  end
+  res.perc=fac
+  return res.done
+ end
+ return res
+end
+
+-- easing
+function ease_linear(from,to,dist,fac) return from+dist*fac end
+function ease_inout(from,to,dist,fac) fac=fac*fac*(3-2*fac) return from*(1-fac) + to*fac end
+function ease_in(from,to,dist,fac) fac=fac*fac return from*(1-fac) + to*fac end
+function ease_out(from,to,dist,fac) fac=1-(1-fac)*(1-fac) return from*(1-fac) + to*fac end
+function ease_back(from,to,dist,fac) fac-=1 return dist * (fac * fac * (3 * fac + 2) + 1) + from end
+function ease_backin(from,to,dist,fac) return ease_back(to,from,-dist,1-fac) end
+function ease_bounce(from,to,dist,fac)
+ if fac<1/2.75 then
+  return dist*(7.5625*fac*fac)+from
+ elseif fac<2/2.75 then
+  fac-=(1.5/2.75) return dist*(7.5625*fac*fac+0.75)+from
+ elseif fac<2.5/2.75 then
+  fac-=(2.25/2.75) return dist*(7.5625*fac*fac+0.9375)+from
+ end
+ fac-=(2.625/2.75)
+ return dist*(7.5625*fac*fac+0.984375)+from
+end
+
+-- creates object with
+-- .upd() and .done
+-- that sets 'done=true'
+-- when 'sec' are over
+function wait(sec)
+ local steps=sec*30
+ local cur=0.0
+ local res={perc=0.0}
+ res.upd=function()
+  cur+=timed(1)
+  if(cur>=steps) res.done=true cur=steps
+  if(steps>0)res.perc=cur/steps
+  return res.done
+ end
+ return res
+end
+
+-- move 'cur' closer to 'target'
+-- by factor, snap_at
+-- return => new_val, snapped
+function closer(val,target,factor,snap_at)
+ if(val==target) return target,true
+ factor=factor or .3
+ snap_at=snap_at or .005
+ val=val+(target-val)*factor
+ if(abs(val-target)<=snap_at)then
+  return target,true
+ end
+ return val,false 
+end
+
+__ngn_def_hitb={0,0,7,7}
+function ngn_coll(e1,e2)
+ local h1=e1.hitbox or __ngn_def_hitb
+ local h2=e2.hitbox or __ngn_def_hitb
+ return e1.x+h1[3]>=e2.x+h2[1] and e1.y+h1[4]>=e2.y+h2[2] and e1.x+h1[1]<e2.x+h2[3] and e1.y+h1[2]<e2.y+h2[4]
+end
+
+function ngn_pcoll(x,y,e)
+ local h=e.hitbox or __ngn_def_hitb
+ return x>=e.x+h[1] and y>=e.y+h[2] and x<=e.x+h[3] and y<=e.y+h[4]
+end
+
+-- scene hooks
+-- -----------
+-- timescale => 1 = 30fps
+-- init() => after new menu has been set (e.g. to add menuitems)
+-- out()  => on change to other scene
+-- drw()  => before ent{}.drw
+-- upd()  => before ent{}.upd
+function ngn_scene(new_scene)
+ for i=1,5 do menuitem(i) end
+ if st then
+  if(st.out) st.out()
+  local cloned={}
+  for e in all(st.ent) do
+   add(cloned, e)
+  end
+  foreach(cloned,ngn_rem)
+ end
+ if not(new_scene.timescale or new_scene.timescale == 0) then
+  new_scene.timescale = 1
+ end
+ new_scene.ent = new_scene.ent or {}
+ new_scene.drw = new_scene.drw or
+  function() cls(0) end
+ st=new_scene
+ if(st.init) st.init()
+end
+
+-- add entity
+-- entity hooks:
+-- -------------
+-- layer  => draw layer 0..5
+-- tag""
+-- tags{..}
+-- hitbox{l,t,r,b} bounds: x+l,y+t,x+r,y+b 
+-- drw(e,e.stp)
+-- upd(e,e.stp)
+-- late_upd(e,e.stp) => after all ent{}.upd()
+function ngn_add(e)
+ if(not st.ent) st.ent={}
+ add(st.ent,e)
+ return e
+end
+
+-- get entities with tag
+function ngn_tagged(tag)
+ local res={}
+ for e in all(st.ent) do
+  if(e.tag and e.tag==tag)then
+   add(res,e)
+  elseif(e.tags)then
+   local added=false
+   for t in all(e.tags) do 
+    if(not added and (t == tag)) added=true add(res,e)
+   end
+  end
+ end
+ return res
+end
+
+-- remove e from st.ent[]
+-- but also mark as __destr so
+-- game loop will skip it
+function ngn_rem(e)
+ e.__rem=true
+ del(st.ent,e)
+end
+
+function ngn_upd()
+ if(st.shake) st.shake.upd()
+ if(st.upd) st.upd()
+ -- ent updates
+ local cloned={}
+ for e in all(st.ent) do
+  add(cloned, e)
+ end
+ for e in all(cloned) do
+  if(e.upd and not e.__rem) e.upd(e,e.stp)
+ end
+ for e in all(cloned) do
+  if(e.late_upd and not e.__rem) e.late_upd(e,e.stp)
+ end
+end
+
+function ngn_drw()
+ if(st.shake)then camera(st.shake.x,st.shake.y) else camera() end
+ if(st.drw) st.drw()
+ for i=0,6 do
+  foreach(st.ent,function(e) if(e.layer == i)then e.drw(e,e.stp) end end)
+ end
+end
 
 __gfx__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000

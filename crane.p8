@@ -61,7 +61,7 @@ function ent_claw(crane)
    e.lifetime+=timed(1)
 
    -- destroy self!
-   if(e.y<=10)then
+   if(e.y<=0)then
     ngn_rem(e)
     st.claw=nil
    end
@@ -131,15 +131,41 @@ function ent_crane(x,y)
     -- then look up
     spr(cond(st.claw.lifetime<10,21,22),e.x,e.y,1,1,e.dir==1)
    end
+   -- energy-pipe pixel
+   rect(e.x+3,e.y+9,e.x+3,e.y+8,1)
+  end
+ }
+end
+
+function ent_energy(col)
+ return {
+  x=14*8+2,y=14*8+1,st="left",layer=3,
+  late_upd=function(e,st)
+   local crane=st.crane
+   if(e.x<=crane.x+4)then
+    e.st="up"
+   end
+   if(e.st=="left")then
+    e.x-=timed(2)
+   elseif(e.st=="up")then
+    e.x=crane.x+3
+    e.y-=.25
+    if(e.y<=crane.y+5)then ngn_rem(e) return end
+   end
+  end,
+  drw=function(e)
+   rect(e.x,e.y,e.x,e.y,col)
   end
  }
 end
 
 function ent_battery()
+ local energy_every=8
  return {
   layer=3,
   amount=100.0,
   nearly_empty=false,
+  next_energy_in=energy_every,
   ani_cnt=0,
   upd=function(e)
    e.amount-=timed(.1)
@@ -147,6 +173,11 @@ function ent_battery()
    e.nearly_empty=e.amount<=10
    e.ani_cnt+=timed(1)
    if(e.ani_cnt>30) then e.ani_cnt=0 end
+   e.next_energy_in-=timed(1)
+   if(e.next_energy_in<=0 and e.amount>0)then
+    ngn_add(ent_energy(cond(e.nearly_empty,6,12)))
+    e.next_energy_in=energy_every
+   end
   end,
   drw=function(e)
     local bar={14*8+2,12*8+6,3,9}
@@ -158,7 +189,7 @@ function ent_battery()
       rect(light[1],light[2],light[1],light[2],11)
     end
     -- energy bar
-    if(e.amount>0) then rectfill(bar[1],bar[2]+bar[4],bar[1]+bar[3]-1,bar[2]+bar[4]-bar[4]*e.amount/100.0,cond(nearly_empty,8,12)) end
+    if(e.amount>0) then rectfill(bar[1],bar[2]+bar[4],bar[1]+bar[3]-1,bar[2]+bar[4]-bar[4]*e.amount/100.0,cond(e.nearly_empty,8,12)) end
   end
  }
 end

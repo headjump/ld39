@@ -35,13 +35,15 @@ function sc_finished()
 end
 function sc_game(level,easy)
  local crane={x=20,y=104,layer=3,
-  spd=0,dir=1,shooting=false,
+  spd=0,dir=1,shooting=nil,
   ani_cnt=0,
   driving=false,
   upd=function(e)
    if((not e.shooting) and (btnp(4) or btnp(5)))then
     --shoot
-    e.shooting=true
+    e.shooting={
+     y=e.y,spd=3,grav=.1
+    }
    end
    if(btnp(0))then e.dir = -1 end
    if(btnp(1))then e.dir = 1 end
@@ -69,7 +71,9 @@ function sc_game(level,easy)
   end,
   drw=function(e)
    spr(cond(e.driving and (flr(e.ani_cnt/5)%2==0), 5, 6),e.x,e.y,1,1,e.dir==1)
-   if(e.shooting) then
+   local sh=e.shooting
+   if(sh) then
+    spr(1,e.x,sh.y)
    else
     spr(23,e.x,e.y-8,1,1,e.dir==1)
    end

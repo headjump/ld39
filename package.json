@@ -2,5 +2,8 @@
   "name": "ld39",
   "version": "1.0.0",
   "main": "index.js",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "gh-pages": "^1.0.0"
+  }
 }

@@ -2,3 +2,4 @@
 *.js
 !build/*.html
 !build/*.js
+node_modules

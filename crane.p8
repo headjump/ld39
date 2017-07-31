@@ -33,8 +33,9 @@ function sc_finished()
   end
  }
 end
-function sc_game(level,easy)
- local crane={x=20,y=104,layer=3,
+
+function ent_crane(x,y)
+ return {x=x,y=y,layer=3,
   spd=0,dir=1,shooting=nil,
   ani_cnt=0,
   driving=false,
@@ -79,26 +80,26 @@ function sc_game(level,easy)
    end
   end
  }
- local drawmap={
-  layer=3,
-  drw=function(e) map(0,0,0,0,16,16) end
- }
- local energy={
+end
+
+function ent_battery()
+ return {
   layer=3,
   amount=100.0,
+  nearly_empty=false,
   ani_cnt=0,
   upd=function(e)
    e.amount-=timed(.1)
    e.amount=in_range(e.amount,0,100.0)
+   e.nearly_empty=e.amount<=10
    e.ani_cnt+=timed(1)
    if(e.ani_cnt>30) then e.ani_cnt=0 end
   end,
   drw=function(e)
     local bar={14*8+2,12*8+6,3,9}
     local light={bar[1],bar[2]-4}
-    local nearly_empty=e.amount<=10
     -- blinking light
-    if(nearly_empty)then
+    if(e.nearly_empty)then
       rect(light[1],light[2],light[1],light[2],cond(flr(e.ani_cnt/15)%2==0,8,2))
     else
       rect(light[1],light[2],light[1],light[2],11)
@@ -107,12 +108,21 @@ function sc_game(level,easy)
     if(e.amount>0) then rectfill(bar[1],bar[2]+bar[4],bar[1]+bar[3]-1,bar[2]+bar[4]-bar[4]*e.amount/100.0,cond(nearly_empty,8,12)) end
   end
  }
+end
+
+function sc_game(level,easy)
+ local crane=ent_crane(20,104)
+ local drawmap={
+  layer=3,
+  drw=function(e) map(0,0,0,0,16,16) end
+ }
+ local battery=ent_battery()
 
  return {
-  init=function()
-   ngn_add(drawmap) ngn_add(energy) ngn_add(crane)
+  init=function(st)
+   foreach({drawmap,battery,crane},ngn_add)
    st.crane=crane
-   st.energy=energy
+   st.battery=battery
   end,
   grav={x=0,y=.12},
   upd=function()
@@ -354,7 +364,7 @@ function ngn_scene(new_scene)
  new_scene.drw = new_scene.drw or
   function() cls(0) end
  st=new_scene
- if(st.init) st.init()
+ if(st.init) st.init(st)
 end
 
 -- add entity
@@ -399,17 +409,17 @@ end
 
 function ngn_upd()
  if(st.shake) st.shake.upd()
- if(st.upd) st.upd()
+ if(st.upd) st.upd(st)
  -- ent updates
  local cloned={}
  for e in all(st.ent) do
   add(cloned, e)
  end
  for e in all(cloned) do
-  if(e.upd and not e.__rem and not __ngn_scene_switched) e.upd(e,e.stp)
+  if(e.upd and not e.__rem and not __ngn_scene_switched) e.upd(e,st)
  end
  for e in all(cloned) do
-  if(e.late_upd and not e.__rem and not __ngn_scene_switched) e.late_upd(e,e.stp)
+  if(e.late_upd and not e.__rem and not __ngn_scene_switched) e.late_upd(e,st)
  end
  __ngn_scene_switched = false
 end

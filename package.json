@@ -1,9 +1,13 @@
 {
   "name": "ld39",
   "version": "1.0.0",
-  "main": "index.js",
+  "scripts": {
+    "deploy": "node deploy.js"
+  },
+  "main": "deploy.js",
   "license": "MIT",
   "dependencies": {
+    "filecopy": "^3.0.1",
     "gh-pages": "^1.0.0"
   }
 }

@@ -18,7 +18,7 @@ function sc_start()
   end,
   drw=function()
    cls()
-   print("start",20,20,11)
+   print("press — to start",20,20,11)
   end
  }
 end

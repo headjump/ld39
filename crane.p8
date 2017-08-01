@@ -31,7 +31,7 @@ function sc_start()
   end,
   drw=function(st)
    cls()
-   print("the last robot",36,20,9)
+   print("the last crane",36,20,9)
    print("press — to start",30,40,cond(st.blink<=15,6,5))
    spr(cond(flr(st.blink/5)%2==0,1,3),56,94,2,2)
    print("early prototype",34,110,8)

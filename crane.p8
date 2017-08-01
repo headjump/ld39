@@ -87,9 +87,18 @@ function ent_claw(crane)
    e.lifetime+=timed(1)
 
    -- destroy self!
-   if(e.y<=0)then
+   if(e.y<=-6)then
     ngn_rem(e)
     st.claw=nil
+    for i=0,5 do
+     ngn_part(
+      e.x+rnd(16),e.y+8,-- x,y
+      rnd(2)-1,rnd(1)+1,-- sx,sy
+      1.2,14,-- grav,lifetime
+      {2,1,1},-- sizes
+      {cond(rnd(1)<.5,13,9),9,5},-- cols
+      .9) -- acc (default=1)
+     end
    end
   end,
   drw=function(e)
@@ -115,12 +124,12 @@ function ent_crane(x,y)
   upd=function(e,st)
    --if(rnd(1)<.2)then ngn_add(ent_energy_fillup(e,11,7)) end
 
-   -- alive:
-   if((not st.claw) and (btnp(4) or btnp(5)))then
-    st.claw=ngn_add(ent_claw(e))
-   end
    local slowdown=function() e.spd*=timed_fac(.85) end
    if(not st.claw and not e.dead)then
+    -- launch claw
+    if((btnp(4) or btnp(5)))then
+     st.claw=ngn_add(ent_claw(e))
+    end
     -- set dir, driving
     if(btnp(0))then e.dir = -1 end
     if(btnp(1))then e.dir = 1 end

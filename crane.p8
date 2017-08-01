@@ -108,11 +108,11 @@ function ent_crane(x,y)
  return {x=x,y=y,layer=3,
   spd=0,dir=1,
   ani_cnt=0,
-  ttl_when_no_battery=45,
+  ttl_when_no_battery=30,
   dead=false,  
   driving=false,
   upd=function(e,st)
-   -- early exit when dead!!
+   --if(rnd(1)<.2)then ngn_add(ent_energy_fillup(e,11,7)) end
 
    -- alive:
    if((not st.claw) and (btnp(4) or btnp(5)))then
@@ -195,37 +195,71 @@ function ent_energy(col)
    end
   end,
   drw=function(e)
-   rect(e.x,e.y,e.x,e.y,col)
+   rect(e.x,e.y,cond(e.st=="left",1,0)+e.x,e.y,col)
+  end
+ }
+end
+
+function ent_energy_fillup(crane,col,col_in_bar)
+ return {
+  x=crane.x+4,y=14*8+1,st="right",layer=3,flashtime=15,
+  upd=function(e,st)
+   local battery_x=st.battery.bar[1]+1
+   if(e.x>=battery_x-1)then
+    e.st="up"
+    e.x=battery_x
+   end
+   if(e.st=="right")then
+    e.x+=timed(2.5)
+   elseif(e.st=="up")then
+    e.x=battery_x
+    e.y-=timed(.25)
+    local bar=st.battery.bar
+    local bat_y=bar[2]+bar[4]
+    if(e.y<=bat_y)then e.y=bat_y e.st="flash" end
+   elseif(e.st=="flash")then
+    e.flashtime-=timed(1)
+    if(e.flashtime<=0)then ngn_rem(e) return end    
+   end
+  end,
+  drw=function(e,st)
+   if(e.st=="flash")then
+    local bar=st.battery.bar
+    rect(bar[1],bar[2]+bar[4]-1,bar[1]+bar[3]-1,bar[2]+bar[4],col_in_bar)
+   else
+    rect(e.x,e.y,cond(e.st=="right",1,0)+e.x,e.y,col)
+   end
   end
  }
 end
 
 function ent_battery()
- local energy_every=8
+ local energy_every=15
  return {
   layer=3,
+  bar={14*8+2,12*8+6,3,9},
   amount=100.0,
   nearly_empty=false,
   next_energy_in=energy_every,
   ani_cnt=0,
   upd=function(e)
-   e.amount-=timed(.1)
+   e.amount-=timed(.2)
    e.amount=in_range(e.amount,0,100.0)
-   e.nearly_empty=e.amount<=10
+   e.nearly_empty=e.amount<=15
    e.ani_cnt+=timed(1)
    if(e.ani_cnt>30) then e.ani_cnt=0 end
    e.next_energy_in-=timed(1)
    if(e.next_energy_in<=0 and e.amount>0)then
-    ngn_add(ent_energy(cond(e.nearly_empty,6,12)))
+    ngn_add(ent_energy(cond(e.nearly_empty,8,12)))
     e.next_energy_in=energy_every
    end
   end,
   drw=function(e)
-    local bar={14*8+2,12*8+6,3,9}
+    local bar=e.bar
     local light={bar[1],bar[2]-4}
     -- blinking light
     if(e.nearly_empty)then
-      rect(light[1],light[2],light[1],light[2],cond(flr(e.ani_cnt/15)%2==0,8,2))
+      if(flr(e.ani_cnt/8)%2)then rectfill(light[1]-1,light[2]-2,light[1]+1,light[2],8) end
     else
       rect(light[1],light[2],light[1],light[2],11)
     end

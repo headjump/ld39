@@ -7,7 +7,7 @@ __lua__
 --            for ld39
 
 -- --[config]--
---debug=true 
+debug=true
 st={} -- game state
 function _init() ngn_scene(sc_start()) end
 
@@ -64,6 +64,7 @@ function ent_claw(crane)
  return {
   x=crane.x,
   y=crane.y-8+2,
+  hitbox={-8,1,8,7},
   spd=-.1,
   layer=3,
   scale=1,
@@ -182,6 +183,7 @@ function ent_orb(x,y)
  return {
   layer=3,
   x=x,y=y,
+  hitbox={1,1,6,6},
   ani=ani({11,12,13},true,10),
   upd=function(e)
    e.ani.upd()
@@ -658,6 +660,9 @@ function ngn_drw()
  if(st.drw) st.drw(st)
  for i=0,6 do
   foreach(st.ent,function(e) if(e.layer == i)then e.drw(e,st) end end)
+ end
+ if(debug)then
+
  end
 end
 

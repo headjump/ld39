@@ -259,7 +259,7 @@ function ent_battery()
     local light={bar[1],bar[2]-4}
     -- blinking light
     if(e.nearly_empty)then
-      if(flr(e.ani_cnt/8)%2)then rectfill(light[1]-1,light[2]-2,light[1]+1,light[2],8) end
+      if(flr(e.ani_cnt/8)%2==0)then rectfill(light[1]-1,light[2]-2,light[1]+1,light[2],8) end
     else
       rect(light[1],light[2],light[1],light[2],11)
     end

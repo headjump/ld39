@@ -61,6 +61,47 @@ function sc_gameover()
  }
 end
 
+function ent_consumer()
+ local me=nil
+ me={
+  layer=3,
+  ents={},
+  busy=false,
+  ani=ani({27,28},true),
+  add=function(ent)
+   local to_consuming=ent.to_consuming()
+   to_consuming.bind_to_claw = true
+   add(me.ents,to_consuming)
+   ngn_rem(ent)
+  end,
+  late_upd=function(e,st)
+   e.ani.upd()
+   local cr=st.crane
+   local cl=st.claw
+   e.busy=false
+   for ent in all(e.ents) do
+    e.busy=true
+    if(not st.claw)then ent.bind_to_claw=false end
+    if(ent.energy <= 0)then del(ents,ent) end
+   end
+  end,
+  drw=function(e)
+   local at_crane=st.crane.y-8+2
+   local consuming=false--if sth is at crane
+   local x
+   local y
+   for ent in all(e.ents) do
+    x=st.crane.x+3
+    y=ent.bind_to_claw and st.claw and st.claw.y or st.crane.y-8+2
+    if(y==at_crane)then consuming=true; ent.bind_to_claw=false end
+    ent.drw(ent,ent.bind_to_claw and not y==at_crane,x,y)
+   end
+   if(consuming)then spr(e.ani.spr,st.crane.x,st.crane.y-6) end
+  end
+ }
+ return me
+end
+
 function ent_claw(crane)
  return {
   x=crane.x,
@@ -108,6 +149,7 @@ function ent_claw(crane)
      if(ngn_coll(e,cons))then
       e.grabbing=true
       e.go_down=true
+      st.consumer.add(cons)
       for i=1,4 do
        ngn_part(
         e.x+1,e.y+6,-- x,y
@@ -117,7 +159,6 @@ function ent_claw(crane)
         {12,13,1},-- cols
         .9) -- acc (default=1)
       end
-      cons.grabbed=true
      end
     end
 
@@ -147,7 +188,7 @@ function ent_crane(x,y)
  return {x=x,y=y,layer=3,
   spd=0,dir=1,
   ani_cnt=0,
-  ttl_when_no_battery=30,
+  ttl_when_no_battery=30,--also reset below!
   dead=false,  
   dead_since=0,
   driving=false,
@@ -158,7 +199,7 @@ function ent_crane(x,y)
    if(e.dead)then e.dead_since+=timed(1) end
    if(not st.claw and not e.dead)then
     -- launch claw
-    if((btnp(4) or btnp(5)))then
+    if((btnp(4) or btnp(5)) and not st.consumer.busy)then
      st.claw=ngn_add(ent_claw(e))
     end
     -- set dir, driving
@@ -194,10 +235,10 @@ function ent_crane(x,y)
    -- battery empty?
    if(st.battery.amount<=0)then
     e.ttl_when_no_battery-=timed(1)
-    if(e.ttl_when_no_battery<=0)then
+    if(e.ttl_when_no_battery<=0 and not st.claw)then
      e.dead=true
     end
-   end
+   else e.ttl_when_no_battery=30 end
   end,
   drw=function(e,st)
    if(e.dead)then
@@ -206,8 +247,14 @@ function ent_crane(x,y)
     if(not st.claw)then 
      -- rotate wheels when driving
      spr(cond(e.driving and (flr(e.ani_cnt/5)%2==0), 5, 6),e.x,e.y,1,1,e.dir==1)
-     -- tiny claw
-     spr(23,e.x,e.y-8)
+     if(st.consumer.busy)then
+      -- large claw while consuming
+      spr(7,e.x-2,e.y-8)
+      spr(8,e.x+2,e.y-8)
+     else
+      -- tiny claw
+      spr(23,e.x,e.y-8)
+     end
     else
      -- duck to dispatch claw,
      -- then look up
@@ -225,21 +272,21 @@ function ent_orb(x,y)
   tag=t_consumable,
   layer=3,
   x=x,y=y,
+  to_consuming=function()
+   return{
+    energy=50,
+    drw=function(e,still_grabbing,x,y)
+     spr(14,x-3,y-3)
+    end
+   }
+  end,
   hitbox={1,1,6,6},
   ani=ani({11,12,13},true,10),
   upd=function(e,st)
    e.ani.upd()
-   if not e.grabbed then
-   end
-  end,
-  late_upd=function(e,st)
-   if e.grabbed then
-    e.x=st.crane.x
-    e.y=st.claw and st.claw.y or st.crane.y-8+2
-   end
   end,
   drw=function(e)
-   spr(cond(e.grabbed,14,e.ani.spr),e.x,e.y)
+   spr(e.ani.spr,e.x,e.y)
   end
  }
 end
@@ -339,6 +386,7 @@ function sc_game(level,easy)
  local crane=ent_crane(60,104)
  local drawmap={ layer=3, drw=function(e) map(0,0,0,0,16,16) end }
  local battery=ent_battery()
+ local consumer=ent_consumer()
  local drawrope={ layer=3,
   drw=function(_,st)
    if(not st.claw)then return end
@@ -354,9 +402,10 @@ function sc_game(level,easy)
 
  return {
   init=function(st)
-   foreach({drawmap,drawrope,battery,crane},ngn_add)
+   foreach({drawmap,drawrope,battery,crane,consumer},ngn_add)
    st.crane=crane
    st.battery=battery
+   st.consumer=consumer
   end,
   next_orb_in=30*4,
   grav={x=0,y=.12},

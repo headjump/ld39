@@ -15,7 +15,7 @@ When "shooting", a new `ent_claw(crane)` is created and stored in `st.claw`. Whi
 
 ### `ent_claw(crane)`
 
-Moves up and down, when colliding with things tagged `t_consumable` it sets itself to `.grabbing=true` and `other.grabbed=true`
+Moves up and down, when colliding with things tagged `t_consumable` it sets itself to `.grabbing=true` and adds the other to `st.consumer(...)`. When moving down, it's `.go_down=true`.
 
 
 ---
@@ -35,6 +35,14 @@ Blue energy light moving to the crane. Gets red when battery `nearly_empty`
 ## `ent_energy_fillup`
 
 "Reverse engergy", flowing from crane to battery, when sucking up an enemy.
+
+
+---
+## Consumer
+
+### `ent_consumer()` (as `st.consumer`)
+
+Handles consuming of caught entities. `.add(entity)` and. Crane can only shoot again if consumer is not `.busy`
 
 
 ---

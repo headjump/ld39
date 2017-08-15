@@ -13,13 +13,12 @@ t_consumable=0
 function _init() ngn_scene(sc_start()) end
 
 function sc_start()
+ local blink_cnt=cntdwn(30,true)
  return {
-  blink=0,
   grav={x=0,y=.12},
   upd=function(st)
    if(btnp(4) or btnp(5)) then ngn_scene(sc_game(1)) end
-   st.blink+=timed(1)
-   if(st.blink>=30)then st.blink=0 end
+   blink_cnt.upd()
    if(rnd(1)<.4)then
     ngn_part(
      rnd(14*4)+36,24,-- x,y
@@ -33,8 +32,8 @@ function sc_start()
   drw=function(st)
    cls()
    print("the last crane",36,20,9)
-   print("press — to start",30,40,cond(st.blink<=15,6,5))
-   spr(cond(flr(st.blink/5)%2==0,1,3),56,94,2,2)
+   print("press — to start",30,40,cond(blink_cnt.val<=15,5,6))
+   spr(cond(flr(blink_cnt.val/5)%2==0,1,3),56,94,2,2)
    print("early prototype",34,110,8)
   end
  }
@@ -43,20 +42,19 @@ end
 function sc_gameover()
  return {
   blink=0,
-  wait_till_btn=45,
+  wait_till_btn=cntdwn(45,false),
+  blink_tgl=cntdwn(15,true),
+  blink_st=0,
   upd=function(st)
-   if(st.wait_till_btn<=0 and (btnp(4) or btnp(5))) then ngn_scene(sc_start()) end
-   st.wait_till_btn-=timed(1)
-   if(st.wait_till_btn<=0)then 
-    st.wait_till_btn=0 
-    st.blink+=timed(1)
-    if(st.blink>=30)then st.blink=0 end
+   if(st.wait_till_btn.upd())then 
+    if(btnp(4) or btnp(5))then ngn_scene(sc_start()) return end
+    if(st.blink_tgl.upd())then st.blink_st= not st.blink_st end
    end
   end,
   drw=function(st)
    cls()
    print("you ran out of energy",22,20,8)
-   if(st.wait_till_btn<=0)then print("press — to retry",30,40,cond(st.blink<=15,5,6)) end
+   if(st.wait_till_btn.over)then print("press — to retry",30,40,cond(st.blink_st,5,6)) end
   end
  }
 end
@@ -396,6 +394,25 @@ function ent_battery()
  }
 end
 
+function director()
+ local next_orb_cnt=cntdwn(30*4,true)
+ local leave_after_death=cntdwn(45)
+ return {
+  layer=4,
+  upd=function(e,st)
+   if st.crane.dead then 
+    if(leave_after_death.upd())then ngn_scene(sc_gameover()) end
+    return--!!!!!!!!
+   end
+
+   if next_orb_cnt.upd() then
+    next_orb_cnt.set(30*(rnd(2)+3))
+    ngn_add(ent_orb(rnd(8)*13+8,rnd(8)*6+8))
+   end
+  end
+ }
+end
+
 function sc_game(level,easy)
  local crane=ent_crane(60,104)
  local drawmap={ layer=3, drw=function(e) map(0,0,0,0,16,16) end }
@@ -403,35 +420,23 @@ function sc_game(level,easy)
  local consumer=ent_consumer()
  local drawrope={ layer=3,
   drw=function(_,st)
-   if(not st.claw)then return end
-   for i=st.claw.y+8,st.crane.y,8 do spr(24,st.claw.x-1+cond(i%30>15,1,0),i) end
+   if(st.claw)then
+    for i=st.claw.y+8,st.crane.y,8 do spr(24,st.claw.x-1+cond(i%30>15,1,0),i) end
+   end
   end}
- local director=function(st)
-  st.next_orb_in-=timed(1)
-  if(st.next_orb_in<=0)then
-   st.next_orb_in=30*(rnd(2)+3)
-   ngn_add(ent_orb(rnd(8)*13+8,rnd(8)*6+8))
-  end
- end 
 
  return {
   init=function(st)
-   foreach({drawmap,drawrope,battery,crane,consumer},ngn_add)
-   st.crane=crane
-   st.battery=battery
-   st.consumer=consumer
+   foreach({
+    drawmap,
+    drawrope,
+    battery,
+    crane,
+    consumer,
+    director()},ngn_add)
+   st.crane=crane;st.battery=battery;st.consumer=consumer;
   end,
-  next_orb_in=30*4,
-  grav={x=0,y=.12},
-  upd=function(st)
-   if(st.crane.dead)then
-    if(st.crane.dead_since>=3*30)then
-     ngn_scene(sc_gameover())
-    end
-   else
-    director(st)
-   end
-  end,
+  grav={x=0,y=.12}
  }
 end
 
@@ -503,6 +508,27 @@ end
 -- by 'fac' (factor 0..1)
 function array_index(cnt,fac)
  return min(cnt,1+flr(cnt*fac))
+end
+
+-- use upd() each frame to countdown.
+-- upd() returns true when countdown is at 0
+-- if reset_when_zero the countdown will
+--  restart immediately
+function cntdwn(steps,reset_when_zero)
+ local me
+ me={
+  val=steps,
+  over=false,
+  set=function(new_steps) steps=new_steps; me.val=new_steps; me.over=false end,
+  upd=function()
+   me.val-=timed(1)
+   if(me.val<=0)then me.val=cond(reset_when_zero,steps,0) me.over=true return true end
+   me.over=false
+   return false
+  end,
+  reset=function() me.val=steps end
+ }
+ return me
 end
 
 -- create particle
@@ -778,7 +804,7 @@ function ngn_drw()
  if(st.shake)then camera(st.shake.x,st.shake.y) else camera() end
  if(st.drw) st.drw(st)
  for i=0,6 do
-  foreach(st.ent,function(e) if(e.layer == i)then e.drw(e,st) end end)
+  foreach(st.ent,function(e) if(e.layer == i and e.drw)then e.drw(e,st) end end)
  end
  if(debug)then
 

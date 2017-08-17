@@ -42,7 +42,7 @@ Blue energy light moving to the crane. Gets red when battery `nearly_empty`
 
 ### `ent_consumer()` (as `st.consumer`)
 
-Handles consuming of caught entities. `.add(entity)` and. Crane can only shoot again if consumer is not `.busy`
+Handles consuming of caught entities. `.add(entity)` and. If crane shoots while consumer is `.busy`, it will launch the orb instead of it's claw. This is the only way to attack opponents.
 
 
 ---
@@ -51,6 +51,10 @@ Handles consuming of caught entities. `.add(entity)` and. Crane can only shoot a
 
 ### `st_game()`
 
-Has `director`-function that steps though the game - from tutorial to enemy creation to making everything more difficult.
+Creates crane, claw, ... and **director**
 
-In `upd` waits some sec for `crane.dead_since` until switching to `sc_cameover()`
+Has `director`-entity that steps though the game - from tutorial to enemy creation to making everything more difficult.
+
+### `director()`
+
+Entity that handles the "game phases", from tutorial to gameover after `crane.dead`. `phases`-array holds function-links with args that return `{upd, ?drw}`objects and automatically steps to next phase-item whenever a `phase.upd()` returns `true`.

@@ -8,8 +8,8 @@ __lua__
 
 -- --[config]--
 --debug=true
-st={}
-t_consumable=0
+st={}--entire game state
+t_consumable=0--entity tags
 function _init() ngn_scene(sc_start()) end
 
 function sc_start()
@@ -230,7 +230,7 @@ function ent_crane(x,y)
    end
    e.x+=e.spd -- move!
    local hit_wall
-   e.x,hit_wall=in_range(e.x,12,127-25)
+   e.x,hit_wall=in_range(e.x,12,127-26)
    if(hit_wall)then e.spd=0 end
    e.ani_cnt+=timed(1)
    if(e.ani_cnt>=90)then e.ani_cnt=1 end
@@ -394,6 +394,15 @@ function ent_battery()
 end
 
 function director()
+ local p_wait=cntdwn
+ local p_tut_move=function()
+  local xx=cntdwn(60)
+  xx.drw=function() print(xx.val,40,40) end
+  return xx
+ end
+ local phase
+ local phases
+
  local next_orb_cnt=cntdwn(30*4,true)
  local leave_after_death=cntdwn(45)
  return {
@@ -401,13 +410,28 @@ function director()
   upd=function(e,st)
    if st.crane.dead then 
     if(leave_after_death.upd())then ngn_scene(sc_gameover()) end
-    return--!!!!!!!!
-   end
+   else
+    if not phases then
+     phases={
+      {p_wait,30},
+      {p_tut_move},
+      {p_wait,60},
+      {p_tut_move}
+     }
+    end
+    --create current phase
+    if(not phase and #phases>0)then phase=phases[1][1](phases[1][2],phases[1][3]) end
+    --upd phase and maybe proceed
+    if(phase and phase.upd(e,st)) then del(phases,phases[1]); phase=nil end
 
-   if next_orb_cnt.upd() then
-    next_orb_cnt.set(30*(rnd(2)+3))
-    ngn_add(ent_orb(rnd(8)*13+8,rnd(8)*6+8))
+    if next_orb_cnt.upd() then
+     next_orb_cnt.set(30*(rnd(2)+3))
+     ngn_add(ent_orb(rnd(8)*13+8,rnd(8)*6+8))
+    end
    end
+  end,
+  drw=function(e,st)
+   if(phase and phase.drw)then phase.drw(e,st) end
   end
  }
 end

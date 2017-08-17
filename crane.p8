@@ -90,6 +90,7 @@ function ent_consumer()
      st.battery.amount+=timed(1)
     end
    end
+   e.generating_energy=generating_energy
    if(generating_energy)then
     e.wait_till_dispatch-=timed(1)
     if(e.wait_till_dispatch<=0)then
@@ -211,7 +212,7 @@ function ent_crane(x,y)
    if(e.dead)then e.dead_since+=timed(1) end
    if(not st.claw and not e.dead)then
     -- launch claw
-    if((btnp(4) or btnp(5)) and not st.consumer.busy)then
+    if((btnp(4) or btnp(5)) and not st.consumer.generating_energy)then
      st.claw=ngn_add(ent_claw(e))
     end
     -- set dir, driving
@@ -362,14 +363,18 @@ function ent_battery()
  local energy_every=15
  return {
   layer=3,
+  lose_energy=true,
   bar={14*8,11*8+6,7,17},
   amount=100.0,
+  full=true,
   nearly_empty=false,
   next_energy_in=energy_every,
   ani_cnt=0,
   upd=function(e)
-   e.amount=in_range(e.amount-timed(.2),0,100.0)
+   e.amount=in_range(e.amount-cond(e.lose_energy,timed(.2),0),0,100.0)
+   e.full=e.amount>=100.0
    e.nearly_empty=e.amount<=15
+
    e.ani_cnt+=timed(1)
    if(e.ani_cnt>30) then e.ani_cnt=0 end
    e.next_energy_in-=timed(1)
@@ -394,8 +399,11 @@ function ent_battery()
 end
 
 function director()
- local drw_msg=function(msg,col)
-  print(msg,64-#msg*2,60,col)
+ local drw_msg=function(msg,col,oy)
+  print(msg,64-#msg*2,60+(oy or 0),col)
+ end
+ local p_set_battery=function(active)
+  return {upd=function(e,st) st.battery.lose_energy=active; return true; end}
  end
  local p_msg=function(msg,col,time)
   local cnt=cntdwn(time)
@@ -405,7 +413,7 @@ function director()
   }
  end
  local p_wait=cntdwn
- local p_tut_move=function()
+ local p_tut_move=function(msg,col)
   --show < > arrows next to crane
   local blink_tgl=tgl(10)
   local done_cnt
@@ -415,17 +423,12 @@ function director()
      if(done_cnt.upd()) return true
     else 
      blink_tgl.upd()
-     if(abs(st.crane.spd)>=1)then done_cnt=cntdwn(30) end
+     if(abs(st.crane.spd)>=1)then done_cnt=cntdwn(15) end
     end
    end,
    drw=function(e,st)
     local cx=st.crane.x; local cy=st.crane.y;
-    if(done_cnt)then
-     drw_msg("nice :)",3)
-     spr(65,cx,cy-12)
-     return
-    end
-    drw_msg("move!",7)
+    drw_msg(msg,col)
     if(blink_tgl.val>0)then
      spr(64,cx-12,cy-5)
      spr(64,cx+12,cy-5,1,1,1)
@@ -433,15 +436,37 @@ function director()
    end
   }
  end
- local p_tut_shoot=function()
+ local p_tut_battery=function(msg,col,time)
+  --show arrow to battery
+  local blink_tgl=tgl(10)
+  local done_cnt=cntdwn(time)
+  return {
+   upd=function()
+    blink_tgl.upd()
+    if(done_cnt.upd())then return true end
+   end,
+   drw=function(e,st)
+    local bat=st.battery.bar
+    drw_msg(msg,col)
+    if(blink_tgl.val>0)then spr(66,bat[1]-1,bat[2]-20) end
+   end
+  }
+ end
+ local p_tut_shoot=function(msg,msg2,col)
+  local wait_for_fillup=false
   return {
    upd=function(e,st)
-    return st.claw
+    if(st.consumer.busy)then wait_for_fillup=true end
+    return wait_for_fillup and st.battery.full
    end,
    drw=function(e,st)
     local target=ngn_tagged(t_consumable)[1]
-    if(target)then
+    if(target and not wait_for_fillup)then
+     drw_msg(msg,col)
      print("—",target.x,target.y+10)
+    end
+    if(wait_for_fillup)then
+     drw_msg(msg2,col)
     end
    end
   }
@@ -459,18 +484,24 @@ function director()
    else
     if not phases then
      phases={
+      {p_set_battery,false},
       {p_wait,20},
       {p_msg,"hello last robot",7,60},
       {p_wait,20},
-      {p_msg,"your energy runs out",7,60},
-      {p_wait,20},
-      {p_tut_move},
+      {p_tut_move,"move!",7,"nice :)",3},
+      {p_wait,4},
+      {p_msg,"nice!",7,30},
+      {p_wait,12},
+      {p_msg,"bad news: aliens attack",7,60},
+      {p_wait,6},
+      {p_set_battery,true},
+      {p_tut_battery,"and your energy runs out",7,120},
       {p_wait,25},
-      {p_tut_shoot}
+      {p_tut_shoot,"grap a green alien","your energy fills up",7}
      }
     end
     --create current phase
-    if(not phase and #phases>0)then local nxt=phases[1]; phase=nxt[1](nxt[2],nxt[3],nxt[4]) end
+    if(not phase and #phases>0)then local nxt=phases[1]; phase=nxt[1](nxt[2],nxt[3],nxt[4],nxt[5]) end
     --upd phase and maybe proceed
     if(phase and phase.upd(e,st)) then del(phases,phases[1]); phase=nil end
 
@@ -937,12 +968,12 @@ __gfx__
 11111110101000001011010011111001001111110000000011111111101111110000000055d5d5d5111111155555555500000001100000000000000000000000
 11111111111111111011110011011001001111110011111011111111101111110000000055d5d5d5111111155555555500000001100000000000000000000000
 00000700000000000000000000000000000000000000000000000000000000000550000000000000000000044444444000000000000000000000000000000000
-000077100000007d0000000000000000000000000000000000000000000000000550000000000000000000044444444000000000000000000000000000000000
-00077710070007770000000000000000000000000000000000000000000000000550000000000000000000dd5d55444000000000000000000000000000000000
-00777710777077710000000000000000000000000000000000000000000000000550000000000000000000555555d55000000000000000000000000000000000
-00177710177777100000000000000000000000000000000000000000000000000550000000000000000000555555555000000000000000000000000000000000
-00017710017771000000000000000000000000000000000000000000000000000550000000000000000000122222555000000000000000000000000000000000
-00001710001710000000000000000000000000000000000000000000000000000550000000000000005000044444422000000000000000000000000000000000
+000077100000007d0077710000000000000000000000000000000000000000000550000000000000000000044444444000000000000000000000000000000000
+00077710070007770077710000000000000000000000000000000000000000000550000000000000000000dd5d55444000000000000000000000000000000000
+00777710777077717777777100000000000000000000000000000000000000000550000000000000000000555555d55000000000000000000000000000000000
+00177710177777100777771000000000000000000000000000000000000000000550000000000000000000555555555000000000000000000000000000000000
+00017710017771000077710000000000000000000000000000000000000000000550000000000000000000122222555000000000000000000000000000000000
+00001710001710000007100000000000000000000000000000000000000000000550000000000000005000044444422000000000000000000000000000000000
 00000110000100000000000000000000000000000000000000000000000000000550000000000000005000044444444000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000550000000000000065666624444444000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000550000000000000655555552444444000000000000000000000000000000000

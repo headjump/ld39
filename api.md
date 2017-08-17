@@ -12,6 +12,9 @@ Moves and is `dead` after `ttl_when_no_battery` ticks after `ent_battery.amount`
 
 When "shooting", a new `ent_claw(crane)` is created and stored in `st.claw`. While `st.claw` exists, crane thinks to be in shooting state
 
+    x,y,spd
+    dead
+
 
 ### `ent_claw(crane)`
 
@@ -25,6 +28,11 @@ Moves up and down, when colliding with things tagged `t_consumable` it sets itse
 ### `ent_battery()`
 
 Counts down `amount`, marks itself `nearly_empty`, creates `ent_energy()` until empty.
+
+    amount
+    bar ={x,y,w,h}
+    lose_energy
+    full
 
 
 ### `ent_energy()`
@@ -44,6 +52,7 @@ Blue energy light moving to the crane. Gets red when battery `nearly_empty`
 
 Handles consuming of caught entities. `.add(entity)` and. If crane shoots while consumer is `.busy`, it will launch the orb instead of it's claw. This is the only way to attack opponents.
 
+    add(entity)
 
 ---
 ## Game State and Progression

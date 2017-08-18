@@ -67,7 +67,6 @@ function ent_consumer()
   ents={},
   wait_till_dispatch=dispatch_every,--fillup while consuming
   busy=false,
-  ani=ani({28,29},true),
   add=function(ent)
    local to_consuming=ent.to_consuming()
    to_consuming.bind_to_claw = true
@@ -75,7 +74,6 @@ function ent_consumer()
    ngn_rem(ent)
   end,
   late_upd=function(e,st)
-   e.ani.upd()
    local cr=st.crane
    local cl=st.claw
    local generating_energy=false
@@ -84,14 +82,23 @@ function ent_consumer()
     e.busy=true
     if(not st.claw)then ent.bind_to_claw=false end    
     if(ent.energy <= 0)then del(e.ents,ent) end
-    if(not st.bind_to_claw)then
+    if(not ent.bind_to_claw)then
      generating_energy=true
      ent.energy-=timed(1)
      st.battery.amount+=timed(1)
     end
    end
-   e.generating_energy=generating_energy
+   e.generating_energy=generating_energy--need it in tutorial
    if(generating_energy)then
+    if(rnd(1)>.65)then
+     ngn_part(
+      st.crane.x+rnd(8),st.crane.y-6,-- x,y
+      st.crane.spd,1+rnd(.5),-- sx,sy
+      1.2,6,-- grav,lifetime
+      {2,1,1},-- sizes
+      {11,3,1},-- cols
+      1,true) -- acc (default=1),DRAW IN FRONT
+    end
     e.wait_till_dispatch-=timed(1)
     if(e.wait_till_dispatch<=0)then
      e.wait_till_dispatch=dispatch_every
@@ -110,7 +117,6 @@ function ent_consumer()
     if(y==at_crane)then consuming=true; ent.bind_to_claw=false end
     ent.drw(ent,ent.bind_to_claw and not y==at_crane,x,y)
    end
-   if(consuming)then spr(e.ani.spr,st.crane.x,st.crane.y-6) end
   end
  }
  return me
@@ -400,7 +406,9 @@ end
 
 function director()
  local drw_msg=function(msg,col,oy)
-  print(msg,64-#msg*2,60+(oy or 0),col)
+  local x=64-#msg*2; local y=60+(oy or 0);
+  print(msg,x,y+1,1)
+  print(msg,x,y,col)
  end
  local p_set_battery=function(active)
   return {upd=function(e,st) st.battery.lose_energy=active; return true; end}
@@ -492,25 +500,31 @@ function director()
     if(leave_after_death.upd())then ngn_scene(sc_gameover()) end
    else
     if not phases then
-     phases={
-      {p_set_battery,false},
-      {p_wait,20},
-      {p_msg,"hello, last robot",7,60},
-      {p_wait,20},
-      {p_tut_move,"move!",7},
-      {p_wait,4},
-      {p_msg,"nice!",7,30},
-      {p_wait,12},
-      {p_msg,"bad news: aliens attack",7,60},
-      {p_wait,6},
-      {p_set_battery,true},
-      {p_tut_battery,"and your energy runs out",7,120},
-      {p_wait,25},
-      {p_tut_grap,"grap a green alien",7},
-      {p_wait,25},
-      {p_tut_fillup,"it fill up your energy",7}
-     }
-    end
+     if(true)then--tutorial phases
+      phases={
+       {p_set_battery,false},--disable battery!
+       {p_wait,20},
+       {p_msg,"hello, last robot",7,60},
+       {p_wait,20},
+       {p_tut_move,"move!",7},
+       {p_wait,4},
+       {p_msg,"nice!",7,30},
+       {p_wait,12},
+       {p_msg,"bad news: aliens attack",7,60},
+       {p_wait,6},
+       {p_set_battery,true},--enable battery!
+       {p_tut_battery,"and your energy runs out",7,120},
+       {p_wait,25},
+       {p_tut_grap,"grap a green alien",7},
+       {p_wait,12},
+       {p_tut_fillup,"it fills up your energy",7}
+      }
+     else--important stuff that happens through tut
+      phases={
+      }
+     end
+     append(phases,{})
+    end--/phase creation
     --create current phase
     if(not phase and #phases>0)then local nxt=phases[1]; phase=nxt[1](nxt[2],nxt[3],nxt[4],nxt[5]) end
     --upd phase and maybe proceed
@@ -644,6 +658,12 @@ function tgl(steps,num_vals,init)
  return me
 end
 
+function append(target,arr)
+ for item in all(arr) do
+  add(target,item)
+ end
+end
+
 -- use upd() each frame to countdown.
 -- upd() returns true when countdown is at 0
 -- if reset_when_zero the countdown will
@@ -653,7 +673,7 @@ function cntdwn(steps,reset_when_zero)
  me={
   val=steps,
   over=false,
-  set=function(new_steps) steps=new_steps; me.val=new_steps; me.over=false end,
+  set=function(new_steps,dont_reset) steps=new_steps; if(not dont_reset)then me.val=new_steps; me.over=false end end,
   upd=function()
    me.val-=timed(1)
    if(me.val<=0)then me.val=cond(reset_when_zero,steps,0) me.over=true return true end
@@ -672,11 +692,12 @@ end
 -- sizes
 -- cols
 -- acc (default=1)
-function ngn_part(x,y,sx,sy,grav,lifetime,sizes,cols,acc)
+function ngn_part(x,y,sx,sy,grav,lifetime,sizes,cols,acc,draw_in_front)
  if(not st.__part)then
   st.__part=ngn_add({
   parts={},
   upd=function(e)
+   e.layer=1--hack to draw twice!
    local new_p={}
    for p in all(e.parts) do
     p.x+=timed(p.sx) p.y+=timed(p.sy)
@@ -691,23 +712,27 @@ function ngn_part(x,y,sx,sy,grav,lifetime,sizes,cols,acc)
   end,
   layer=1,
   drw=function(e)
+   local draw_in_front=e.layer==4
    for p in all(e.parts) do
-    local fac=1-(p.lifetime/p.init_lifetime)
-    local sh=p.sizes[array_index(#p.sizes,fac)]/2
-    local col=p.cols[array_index(#p.cols,fac)]
-    if(sh <=.7)then
-     pset(p.x,p.y,col)
-    else
-     rectfill(p.x-sh,p.y-sh,p.x+sh,p.y+sh,col)
+    if(p.draw_in_front==draw_in_front)then    
+     local fac=1-(p.lifetime/p.init_lifetime)
+     local sh=p.sizes[array_index(#p.sizes,fac)]/2
+     local col=p.cols[array_index(#p.cols,fac)]
+     if(sh <=.7)then
+      pset(p.x,p.y,col)
+     else
+      rectfill(p.x-sh,p.y-sh,p.x+sh,p.y+sh,col)
+     end
     end
    end
+   if(e.layer==1)then e.layer=4 end--hack to draw twice!
   end
   })
  end
  add(st.__part.parts,{
   x=x,y=y,sx=sx or 0,sy=sy or 0,sizes=sizes or {1},grav=grav or 0,
   init_lifetime=lifetime or 20,acc=acc or 1,
-  lifetime=lifetime or 20,cols=cols or {0}
+  lifetime=lifetime or 20,cols=cols or {0},draw_in_front=draw_in_front or false
  })
 end
 
@@ -955,13 +980,13 @@ __gfx__
 0000000000097999799949000949799979990000561221655612216d00199991199991005dd611110000000001dddd1001dddd101ddddd10011cd00000000000
 00000000094999999999000000099999999949000dd5dd5005dd55d0000000155100000055551111000000000000000000110000001dd0000011000000000000
 11111111000144444441000000014444444100000999999009c99c90000000000000600000000000500100015555555500000000000000000000000000000000
-11111111000029999920000000002999992000000999999009799790000000000000d00000000000500100015555555500000000000300000000000000000000
-11111111005dd5dd5dd5d00000dd5dd5dd5dd0000aaaaaa0a999999a000000000000600000000000501111115555555530000000000070000000000000000000
-111111100d11111111111d0005111111111115000499994001444410000000000000d0000000000051000001555555550703003000700b000000000000000000
-11111110d1d6d55555d6d150d1d6d55555d6d1d0094994900099990000000000000060000000000656666666555555550700b30000b00b000000000000000000
-11111110516665d5d56661d0d16665d5d56661d0a5dd5dda05dd5dd0000000000000d0000000006555555555155555550b00b000003b03000000000000000000
-11111110d1d6d51515d6d1d051d6d51515d6d150561221655612216500a00a000000600000000065111111151555555500bb3000000b30000000000000000000
-11111110001000000000100000100000000010000dd5dd500dd5dd50009559000000d0000000006511111115155555550000b0000000b0000000000000000000
+11111111000029999920000000002999992000000999999009799790000000000000d00000000000500100015555555500000000000000000000000000000000
+11111111005dd5dd5dd5d00000dd5dd5dd5dd0000aaaaaa0a999999a000000000000600000000000501111115555555500000000000000000000000000000000
+111111100d11111111111d0005111111111115000499994001444410000000000000d00000000000510000015555555500000000000000000000000000000000
+11111110d1d6d55555d6d150d1d6d55555d6d1d00949949000999900000000000000600000000006566666665555555500000000000000000000000000000000
+11111110516665d5d56661d0d16665d5d56661d0a5dd5dda05dd5dd0000000000000d00000000065555555551555555500000000000000000000000000000000
+11111110d1d6d51515d6d1d051d6d51515d6d150561221655612216500a00a000000600000000065111111151555555500000000000000000000000000000000
+11111110001000000000100000100000000010000dd5dd500dd5dd50009559000000d00000000065111111151555555500000000000000000000000000000000
 11111110555555550000000055555555555555555565555500000000000000000000000011000065111111151555555500000001000000000000000000000000
 1111111055555555000000001111111155d111111111111100019990000000000000000011000065111111151555555500000001000000000000000000000000
 1111111055555555000000005555555555555555555d555509999990000000000000000010001165111111151555555500000001000000000000000000000000

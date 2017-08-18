@@ -452,22 +452,31 @@ function director()
    end
   }
  end
- local p_tut_shoot=function(msg,msg2,col)
-  local wait_for_fillup=false
+ local p_tut_grap=function(msg,col)
   return {
    upd=function(e,st)
-    if(st.consumer.busy)then wait_for_fillup=true end
-    return wait_for_fillup and st.battery.full
+    return st.consumer.generating_energy
    end,
    drw=function(e,st)
     local target=ngn_tagged(t_consumable)[1]
-    if(target and not wait_for_fillup)then
+    if(target)then
      drw_msg(msg,col)
      print("—",target.x,target.y+10)
     end
-    if(wait_for_fillup)then
-     drw_msg(msg2,col)
-    end
+   end
+  }
+ end
+ local p_tut_fillup=function(msg,col)
+  local blink_tgl=tgl(10)
+  return {
+   upd=function(e,st)
+    blink_tgl.upd()
+    return st.battery.full
+   end,
+   drw=function(e,st)
+    local bat=st.battery.bar
+    drw_msg(msg,col)
+    if(blink_tgl.val>0)then spr(66,bat[1]-1,bat[2]-20) end
    end
   }
  end
@@ -486,9 +495,9 @@ function director()
      phases={
       {p_set_battery,false},
       {p_wait,20},
-      {p_msg,"hello last robot",7,60},
+      {p_msg,"hello, last robot",7,60},
       {p_wait,20},
-      {p_tut_move,"move!",7,"nice :)",3},
+      {p_tut_move,"move!",7},
       {p_wait,4},
       {p_msg,"nice!",7,30},
       {p_wait,12},
@@ -497,7 +506,9 @@ function director()
       {p_set_battery,true},
       {p_tut_battery,"and your energy runs out",7,120},
       {p_wait,25},
-      {p_tut_shoot,"grap a green alien","your energy fills up",7}
+      {p_tut_grap,"grap a green alien",7},
+      {p_wait,25},
+      {p_tut_fillup,"it fill up your energy",7}
      }
     end
     --create current phase

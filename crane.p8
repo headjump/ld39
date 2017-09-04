@@ -32,7 +32,7 @@ function sc_start()
   drw=function(st)
    cls()
    print("the last crane",36,20,9)
-   print("press — to start",30,40,cond(blink_cnt.val<=15,5,6))
+   print("press ? to start",30,40,cond(blink_cnt.val<=15,5,6))
    spr(cond(flr(blink_cnt.val/5)%2==0,1,3),56,94,2,2)
    print("early prototype",34,110,8)
   end
@@ -54,7 +54,7 @@ function sc_gameover()
   drw=function(st)
    cls()
    print("you ran out of energy",22,20,8)
-   if(st.wait_till_btn.over)then print("press — to retry",30,40,cond(st.blink_st,5,6)) end
+   if(st.wait_till_btn.over)then print("press ? to retry",30,40,cond(st.blink_st,5,6)) end
   end
  }
 end
@@ -413,7 +413,7 @@ end
 c_none=0
 c_after_tut=1
 function checkpoint()
- return c_after_tut
+ return c_none
 end
 
 function director()
@@ -475,7 +475,7 @@ function director()
    end
   }
  end
- local p_tut_grap=function(msg,col,min_time)
+ local p_tut_grab=function(msg,col,min_time)
   local min_time_cnt=cntdwn(min_time)
   local was_generating=false
   return {
@@ -488,7 +488,7 @@ function director()
     local target=ngn_tagged(t_consumable)[1]
     if(target)then
      drw_msg(msg,col)
-     print("—",target.x,target.y+10)
+     print("?",target.x,target.y+10)
     end
    end
   }
@@ -576,7 +576,7 @@ function director()
        {p_set_orb_interval,60,60,true},
        {p_tut_battery,"and your energy runs out",7,120},
        {p_wait,25},
-       {p_tut_grap,"grap a green alien",7,20},
+       {p_tut_grab,"grab a green alien",7,20},
        {p_wait,12},
        {p_tut_fillup,"it fills up your energy",7,60}
       }
@@ -1005,6 +1005,14 @@ function ngn_rem(e)
 end
 
 function ngn_upd()
+ if(st.freeze and st.freeze>0)then
+  st.freeze -= timed(1)
+  if(st.freeze <= 0)then
+    del(st, st.freeze)
+  end
+  return--no update this time!
+ end
+ 
  if(st.shake) st.shake.upd()
  if(st.upd) st.upd(st)
  -- ent updates
@@ -1162,6 +1170,7 @@ __gfx__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+
 __gff__
 0000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000010000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000

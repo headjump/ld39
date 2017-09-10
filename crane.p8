@@ -7,6 +7,7 @@ __lua__
 --            for ld39
 
 -- --[config]--
+version="0.1"
 --debug=true
 st={}--entire game state
 t_consumable=0--entity tags
@@ -32,9 +33,9 @@ function sc_start()
   drw=function(st)
    cls()
    print("the last crane",36,20,9)
-   print("press ? to start",30,40,cond(blink_cnt.val<=15,5,6))
+   print("press — to start",30,40,cond(blink_cnt.val<=15,5,6))
    spr(cond(flr(blink_cnt.val/5)%2==0,1,3),56,94,2,2)
-   print("early prototype",34,110,8)
+   print(" prototype "..version,34,110,8)
   end
  }
 end
@@ -54,7 +55,9 @@ function sc_gameover()
   drw=function(st)
    cls()
    print("you ran out of energy",22,20,8)
-   if(st.wait_till_btn.over)then print("press ? to retry",30,40,cond(st.blink_st,5,6)) end
+   if(st.wait_till_btn.over)then
+    print("press x to retry",30,40,cond(st.blink_st,5,6))
+    end
   end
  }
 end
@@ -488,7 +491,7 @@ function director()
     local target=ngn_tagged(t_consumable)[1]
     if(target)then
      drw_msg(msg,col)
-     print("?",target.x,target.y+10)
+     print("—",target.x,target.y+10)
     end
    end
   }
